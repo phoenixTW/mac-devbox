@@ -89,18 +89,20 @@ jobs:
             exit 1
           fi
 
-      - name: Test installation from release tag
+      - name: Test installation from current main
         run: |
-          echo "🧪 Testing installation from release tag..."
+          echo "🧪 Testing installation from current main branch..."
 
-          export HOME="/tmp/test-devbox-tag"
+          export HOME="/tmp/test-devbox-main"
           export DEVBOX_CONFIG_DIR="$HOME/.devbox"
           export BIN_DIR="$HOME/.local/bin"
 
           rm -rf "$HOME"
           mkdir -p "$HOME" "$BIN_DIR"
 
-          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixTW/mac-devbox/refs/tags/0.0.1/install.sh)"
+          echo "Testing installation from current main branch (commit: $GITHUB_SHA)"
+
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixTW/mac-devbox/$GITHUB_SHA/install.sh)"
 
           if [[ -f "$BIN_DIR/devbox" ]]; then
             echo "✅ devbox binary installed"
