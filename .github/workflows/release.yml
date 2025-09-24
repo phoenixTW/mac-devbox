@@ -38,7 +38,7 @@ jobs:
         uses: saadmk11/changelog-ci@v1.2.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          release_version: ${{ steps.set_version.outputs.new_version }}
+          release_version: ${{ steps.version.outputs.new_version }}
           changelog_filename: CHANGELOG.md
           config_file: .changelog-ci.json
 
