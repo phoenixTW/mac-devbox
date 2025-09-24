@@ -1,0 +1,7 @@
+notion
+docker
+cursor
+arc
+forticlient-vpn
+warp
+font-meslo-lg-nerd-font

@@ -1,0 +1,10 @@
+git
+gnupg
+wget
+curl
+jq
+direnv
+coreutils
+make
+tree
+asdf

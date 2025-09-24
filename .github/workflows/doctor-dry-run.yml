@@ -1,0 +1,25 @@
+name: Doctor Dry-Run
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create temp config
+        run: |
+          mkdir -p /tmp/devbox-config
+          cp -r config.defaults/* /tmp/devbox-config/
+          # keep it minimal to avoid tools on CI
+          jq '.nodejs="latest" | .golang="1.22.5"' /tmp/devbox-config/asdf-tools.json > /tmp/devbox-config/asdf-tools.json.tmp
+          mv /tmp/devbox-config/asdf-tools.json.tmp /tmp/devbox-config/asdf-tools.json
+
+      - name: Smoke test (doctor --dry-run)
+        run: |
+          chmod +x bin/devbox
+          DEVBOX_CONFIG_DIR=/tmp/devbox-config bin/devbox doctor --dry-run

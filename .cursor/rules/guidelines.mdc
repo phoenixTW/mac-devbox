@@ -1,0 +1,192 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+## 1) Project Scope & Principles
+
+* **Purpose:** A tiny Bash CLI to bootstrap and manage a macOS dev machine (Apple Silicon) using **Homebrew**, **asdf**, **zsh/oh‑my‑zsh**, and config files in `~/.devbox`.
+* **Non-Goals:** Cross‑platform support, full dotfiles management, automated macOS permission dialogs, declarative uninstall/rollback (v1).
+* **Key Properties:**
+
+  * **Idempotent**: Re-running commands is safe; print clear status when already installed.
+  * **User-scoped**: No root. Casks install into `~/Applications`; CLI to `~/.local/bin`.
+  * **Config is data**: Single source of truth in `~/.devbox` (overridable via `--config DIR`).
+  * **Small functions**: Keep libs composable; avoid monolith scripts.
+
+## 2) Repo Layout (authoritative)
+
+```
+mac-setup/
+├─ bin/
+│  └─ devbox                 # main CLI entrypoint
+├─ lib/
+│  ├─ common.sh              # logging, config dir, JSON helpers, path setup
+│  ├─ brew.sh                # brew install/init + formula/cask helpers
+│  ├─ asdf.sh                # asdf init, plugin mgmt, tool install/persist
+│  └─ shell.sh               # Xcode CLT, zsh default, OMZ(agnoster), first‑launch
+├─ completions/
+│  ├─ devbox.zsh             # zsh completion
+│  └─ devbox.bash            # bash completion
+├─ config.defaults/
+│  ├─ brew-formulae.txt
+│  ├─ brew-casks.txt
+│  └─ asdf-tools.json
+├─ install.sh                # curl | bash installer (installs CLI + completions)
+└─ .github/workflows/
+   ├─ shellcheck.yml
+   └─ doctor-dry-run.yml
+```
+
+## 3) Coding Standards (Bash)
+
+* **Shell dialect:** Bash (automation) while configuring zsh for interactive use.
+* **Headers:** Every Bash file starts with:
+
+  ```bash
+  #!/usr/bin/env bash
+  set -euo pipefail
+  ```
+* **Lint:** Code passes `shellcheck`. Add minimal `# shellcheck disable=SCXXXX` only when justified.
+* **Style:**
+
+  * Functions: `snake_case` names; one responsibility each.
+  * Variables: `UPPER_SNAKE` for constants/env; `lower_snake` otherwise.
+  * Always **quote** variables (`"$var"`), prefer arrays for lists.
+  * Avoid subshells when not required; capture with `$(...)` not backticks.
+  * Use helper wrappers for logging: `log`, `warn`, `err`, `die` (already in `common.sh`).
+* **Portability:** Assume macOS userland for runtime operations but scripts should run on Linux CI for lint/dry‑run.
+* **Dependencies:** `jq` required (installed via brew formulae by default). No other external deps without ADR.
+
+## 4) Config Contracts (authoritative)
+
+* Default directory: **`$HOME/.devbox`**. Overridable with `--config DIR` or env `DEVBOX_CONFIG_DIR`.
+* Files:
+
+  * `brew-formulae.txt` — one formula per line; `#` comments okay.
+  * `brew-casks.txt` — one cask per line; `#` comments okay.
+  * `asdf-tools.json` — JSON object: `{ "tool": "version" }`. `latest` allowed.
+* **Persistence rules:**
+
+  * `devbox brew <name>` installs then **appends** to the correct list if not present.
+  * `devbox asdf <tool> <ver|latest>` installs then **writes resolved version** to JSON (replace/insert key).
+* **Never** write to repo defaults from the CLI at runtime; only to the user config dir.
+
+## 5) CLI Contract (v1)
+
+* Global: `devbox [--config DIR] <command> [args]`
+* Commands:
+
+  * `bootstrap` — Full idempotent setup (brew, casks, fonts tap, asdf, zsh/OMZ, first‑launch apps).
+  * `brew` — Apply all from config.
+  * `brew <name>` — Install one package; auto-detect formula vs cask; persist to config.
+  * `asdf` — Apply all tools from JSON.
+  * `asdf <tool> <version|latest>` — Install & set global; persist resolved version.
+  * `doctor [--dry-run]` — Print configured vs installed; in dry‑run, do not touch system.
+  * `shell` — Ensure zsh default; install OMZ(agnoster); add plugins (`git asdf direnv`) + `direnv` hook.
+  * `apps` — First-launch Docker/Forti (best‑effort).
+  * Hidden: `--completion zsh|bash` — print completion script to stdout.
+
+## 6) Idempotency & Detection (must)
+
+* **brew**: use `brew list --formula/--cask --versions` to detect; print "already installed" and skip.
+* **asdf**: ensure plugin; resolve version (if `latest`); check `asdf list <tool>`; set global only when different.
+* **Config writes** happen **after** successful install, deduplicated with exact‑match line checks.
+
+## 7) Security & Safety
+
+* Only download via HTTPS (Homebrew, OMZ, GitHub).
+* No `sudo` in code paths; no writes outside `~/.devbox`, `~/.local/bin`, `~/Applications`, zsh dotfiles.
+* PATH edits only in `~/.zprofile` (append if missing). zsh completion block is clearly delimited.
+
+## 8) CI Requirements
+
+* **ShellCheck** workflow must pass for PRs.
+* **Doctor Dry-Run** workflow must pass; it asserts CLI parsing & config handling without installing system tools.
+* New scripts must be added to the ShellCheck job glob.
+
+## 9) Tab Completion Rules
+
+* Maintain `completions/devbox.zsh` and `completions/devbox.bash` in lockstep with CLI.
+* If CLI adds/renames commands or flags, update completions & README examples.
+* Installer must place completions in user directories and wire zsh `compinit` if absent.
+
+## 10) Editing Guidelines for AI
+
+* Prefer **surgical edits** to the smallest relevant file. Update tests/CI/completions/README where applicable.
+* When adding a new feature:
+
+  1. Update **CLI** (`bin/devbox`).
+  2. Add helpers to **lib/** with unit responsibilities.
+  3. Update **completions/**.
+  4. Update **README.md** usage/examples.
+  5. Ensure **CI** continues to pass; add any new files to ShellCheck.
+* When adding a default dependency:
+
+  * Update `config.defaults/*` only.
+  * Do **not** modify a user’s `~/.devbox` in-repo.
+* When modifying logging, preserve the current colorized format and concise wording.
+
+## 11) Common Recipes (AI-ready)
+
+* **Add a new brew formula default:**
+
+  * Edit `config.defaults/brew-formulae.txt` (append line). No code changes.
+* **Add a new brew cask default:**
+
+  * Edit `config.defaults/brew-casks.txt` (append line). No code changes.
+* **Add a new asdf tool default:**
+
+  * Edit `config.defaults/asdf-tools.json` (add key with version or `"latest"`). If plugin requires custom repo, update `lib/asdf.sh` case logic.
+* **Support a new asdf plugin repo mapping:**
+
+  * In `lib/asdf.sh`, extend `case "$name" in ...)` with the plugin repo URL.
+* **Add a new subcommand:**
+
+  * Define function in `bin/devbox`, add to `usage()`, export helpers in `lib/`, update completions + README.
+
+## 12) Testing Guidance
+
+* Local smoke test: `bin/devbox doctor --dry-run` should run without Homebrew/asdf present.
+* Lint: run `shellcheck bin/devbox lib/*.sh install.sh`.
+* For macOS integration testing (optional), document manual steps; keep code idempotent.
+
+## 13) Release & Installer
+
+* Installer defaults to `main`. Allow pinning with env `REF` and `REPO`.
+* On breaking CLI changes, update README + completions + CI.
+
+## 14) Commit/PR Conventions
+
+* **Conventional commits** preferred (`feat:`, `fix:`, `docs:`, `refactor:`, `ci:`, `chore:`).
+* PR checklist (must):
+
+  * [ ] Updated code and **completions**
+  * [ ] Updated **README** examples
+  * [ ] CI green (ShellCheck + Doctor Dry‑Run)
+  * [ ] Idempotency preserved (no destructive defaults)
+
+## 15) Known Constraints
+
+* Xcode CLT and GUI app permissions still require user interaction.
+* `jq` is required; ensure it’s in default formulae list.
+
+## 16) Prompts & Commands (for Cursor)
+
+* **Prompt to add a brew package:**
+
+  > Add formula `xyz` to defaults and ensure `devbox brew xyz` persists to `~/.devbox/brew-formulae.txt`.
+* **Prompt to add an asdf tool:**
+
+  > Add asdf tool `python` with version `3.12.5`; map plugin repo if needed and persist to `~/.devbox/asdf-tools.json`.
+* **Prompt to add a subcommand:**
+
+  > Add `devbox export` that prints a Brewfile and `.tool-versions` generated from `~/.devbox`.
+
+## 17) Acceptance Criteria (must always hold)
+
+* `install.sh` installs CLI to `~/.local/bin/devbox`, seeds `~/.devbox`, sets PATH, installs completions.
+* `devbox bootstrap` runs end‑to‑end idempotently on Apple Silicon.
+* `devbox brew <name>` and `devbox asdf <tool> <ver>` both install and **persist** to config.
+* `devbox doctor --dry-run` works on Linux CI without side effects.
+* All scripts pass ShellCheck in CI.

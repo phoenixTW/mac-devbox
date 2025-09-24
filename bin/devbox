@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+. "$ROOT_DIR/lib/common.sh"
+. "$ROOT_DIR/lib/brew.sh"
+. "$ROOT_DIR/lib/asdf.sh"
+. "$ROOT_DIR/lib/shell.sh"
+
+usage() {
+  cat <<EOF
+devbox — mac setup CLI
+
+Usage:
+  devbox [--config DIR] bootstrap           # full setup (safe to re-run)
+  devbox [--config DIR] brew                # install all formulae & casks from config
+  devbox [--config DIR] brew <name>         # install one package; auto-detect formula/cask; persist to config
+  devbox [--config DIR] asdf                # install all asdf tools from config
+  devbox [--config DIR] asdf <tool> <ver>   # install one tool@version (use 'latest'); persist to config
+  devbox [--config DIR] shell               # zsh/oh-my-zsh/agnoster wiring
+  devbox [--config DIR] apps                # first-launch registrations (docker, forti)
+  devbox [--config DIR] doctor [--dry-run]  # print detected versions vs config
+  devbox version                            # show version information
+  devbox help
+
+Options:
+  --config DIR        Override config directory (default: \$HOME/.devbox)
+
+Hidden:
+  devbox --completion zsh|bash   # print shell completion to stdout
+EOF
+}
+
+print_completion() {
+  case "${1:-}" in
+    zsh)  cat "$ROOT_DIR/completions/devbox.zsh" ;;
+    bash) cat "$ROOT_DIR/completions/devbox.bash" ;;
+    *)    die "Usage: devbox --completion zsh|bash" ;;
+  esac
+}
+
+# Parse global options
+if [[ "${1:-}" == "--config" ]]; then
+  [[ -n "${2:-}" ]] || die "Missing DIR for --config"
+  set_config_dir "$2"; shift 2
+fi
+
+if [[ "${1:-}" == "--completion" ]]; then
+  print_completion "${2:-}"; exit 0
+fi
+
+ensure_config
+
+cmd_bootstrap() {
+  install_xcode_cli
+  install_homebrew
+  brew_update
+  brew_install_from_list "$(brew_formulae_file)" formula
+  brew tap homebrew/cask-fonts >/dev/null 2>&1 || true
+  brew_install_from_list "$(brew_casks_file)" cask
+
+  asdf_init
+  asdf_install_from_json "$(asdf_tools_file)"
+
+  ensure_zsh_default
+  install_oh_my_zsh
+  first_launch_apps
+
+  log "Done. Open a new terminal or run: source \"$ZPROFILE\" && source \"$ZSHRC\""
+}
+
+cmd_brew_all() {
+  install_homebrew
+  brew_update
+  brew_install_from_list "$(brew_formulae_file)" formula
+  brew tap homebrew/cask-fonts >/dev/null 2>&1 || true
+  brew_install_from_list "$(brew_casks_file)"    cask
+}
+
+cmd_brew_one() {
+  local name="$1"
+  install_homebrew
+  brew_update
+  if brew_is_cask "$name"; then
+    brew_install_cask "$name"
+    brew_append_config "$(brew_casks_file)" "$name"
+  elif brew_is_formula "$name"; then
+    brew_install_formula "$name"
+    brew_append_config "$(brew_formulae_file)" "$name"
+  else
+    if brew install "$name" >/dev/null 2>&1; then
+      log "Installed as formula: $name"
+      brew_append_config "$(brew_formulae_file)" "$name"
+    else
+      log "Attempting as cask: $name"
+      brew install --cask "$name"
+      brew_append_config "$(brew_casks_file)" "$name"
+    fi
+  fi
+}
+
+cmd_asdf_all() {
+  install_homebrew
+  asdf_init
+  asdf_install_from_json "$(asdf_tools_file)"
+}
+
+cmd_asdf_one() {
+  local tool="$1" ver="$2"
+  install_homebrew
+  asdf_init
+  asdf_install_tool "$tool" "$ver"
+  asdf_persist_tool "$(asdf_tools_file)" "$tool" "$ver"
+}
+
+cmd_shell() { ensure_zsh_default; install_homebrew; asdf_init; install_oh_my_zsh; log "Shell configured."; }
+cmd_apps()  { first_launch_apps; }
+
+cmd_doctor() {
+  local dry_run=0
+  if [[ "${1:-}" == "--dry-run" ]]; then dry_run=1; fi
+
+  echo "Config dir: $CONFIG_DIR"
+  echo ""
+  echo "[brew formulae]"
+  while read -r f; do
+    [[ -z "$f" || "$f" =~ ^# ]] && continue
+    printf "  %-24s : " "$f"
+    if [[ $dry_run -eq 1 ]]; then
+      echo "(dry-run)"; continue
+    fi
+    install_homebrew
+    if brew_installed_formula "$f"; then brew info "$f" | head -1; else echo "MISSING"; fi
+  done < "$(brew_formulae_file)"
+
+  echo ""
+  echo "[brew casks]"
+  while read -r c; do
+    [[ -z "$c" || "$c" =~ ^# ]] && continue
+    printf "  %-24s : " "$c"
+    if [[ $dry_run -eq 1 ]]; then
+      echo "(dry-run)"; continue
+    fi
+    install_homebrew
+    if brew_installed_cask "$c"; then echo "installed"; else echo "MISSING"; fi
+  done < "$(brew_casks_file)"
+
+  echo ""
+  echo "[asdf tools]"
+  for k in $(json_keys "$(asdf_tools_file)"); do
+    v="$(json_read_k "$(asdf_tools_file)" "$k")"
+    if [[ $dry_run -eq 1 ]]; then
+      printf "  %-24s : wanted=%-10s current=(dry-run)\n" "$k" "$v"
+      continue
+    fi
+    install_homebrew
+    asdf_init
+    cur="$(asdf current "$k" 2>/dev/null | awk '{print $2}')"
+    printf "  %-24s : wanted=%-10s current=%s\n" "$k" "$v" "${cur:-MISSING}"
+  done
+}
+
+case "${1:-help}" in
+  bootstrap)    shift; cmd_bootstrap "$@";;
+  brew)
+    if [[ $# -gt 1 ]]; then shift; cmd_brew_one "$1"; else shift; cmd_brew_all; fi
+    ;;
+  asdf)
+    if [[ $# -gt 2 ]]; then shift; cmd_asdf_one "$1" "$2"; else shift; cmd_asdf_all; fi
+    ;;
+  shell)        shift; cmd_shell;;
+  apps)         shift; cmd_apps;;
+  doctor)       shift; cmd_doctor "${1:-}";;
+  version)      show_version;;
+  help|*)       usage;;
+esac
