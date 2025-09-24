@@ -151,3 +151,67 @@ teardown() {
   local line_count=$(echo "$output" | wc -l | tr -d ' ')
   assert_equals "1" "$line_count"
 }
+
+@test "version_file returns correct path" {
+  load_main_script "$BATS_TEST_DIRNAME/../../lib/common.sh"
+  
+  run version_file
+  assert_success "$status"
+  [[ "$output" =~ \.version$ ]]
+}
+
+@test "get_current_version returns version from file when available" {
+  load_main_script "$BATS_TEST_DIRNAME/../../lib/common.sh"
+  
+  local version_file_path="$(version_file)"
+  echo "1.2.3" > "$version_file_path"
+  
+  run get_current_version
+  assert_success "$status"
+  assert_equals "1.2.3" "$output"
+}
+
+@test "get_current_version falls back to binary version when file missing" {
+  load_main_script "$BATS_TEST_DIRNAME/../../lib/common.sh"
+  
+  local version_file_path="$(version_file)"
+  rm -f "$version_file_path"
+  
+  run get_current_version
+  assert_success "$status"
+  [[ "$output" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+}
+
+@test "store_version writes version to file" {
+  load_main_script "$BATS_TEST_DIRNAME/../../lib/common.sh"
+  
+  store_version "2.3.4"
+  
+  run cat "$(version_file)"
+  assert_success "$status"
+  assert_equals "2.3.4" "$output"
+}
+
+@test "compare_versions handles v prefix correctly" {
+  load_main_script "$BATS_TEST_DIRNAME/../../lib/common.sh"
+  
+  # Test v1.0.0 vs 1.0.0
+  run compare_versions "v1.0.0" "1.0.0"
+  assert_success "$status"
+  
+  # Test 1.0.0 vs v1.0.0
+  run compare_versions "1.0.0" "v1.0.0"
+  assert_success "$status"
+}
+
+@test "compare_versions correctly compares different versions" {
+  load_main_script "$BATS_TEST_DIRNAME/../../lib/common.sh"
+  
+  # Test 1.0.0 >= 0.9.9
+  run compare_versions "1.0.0" "0.9.9"
+  assert_success "$status"
+  
+  # Test 0.9.9 < 1.0.0
+  run compare_versions "0.9.9" "1.0.0"
+  assert_failure "$status"
+}

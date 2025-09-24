@@ -20,6 +20,7 @@ Usage:
   devbox [--config DIR] shell               # zsh/oh-my-zsh/agnoster wiring
   devbox [--config DIR] apps                # first-launch registrations (docker, forti)
   devbox [--config DIR] doctor [--dry-run]  # print detected versions vs config
+  devbox update                             # update devbox CLI to latest version
   devbox version                            # show version information
   devbox help
 
@@ -116,6 +117,85 @@ cmd_asdf_one() {
 cmd_shell() { ensure_zsh_default; install_homebrew; asdf_init; install_oh_my_zsh; log "Shell configured."; }
 cmd_apps()  { first_launch_apps; }
 
+cmd_update() {
+  local current_version latest_version temp_dir backup_dir
+  
+  # Check internet connectivity
+  if ! curl -fsSL --connect-timeout 5 "https://api.github.com" >/dev/null 2>&1; then
+    err "No internet connection. Cannot check for updates."
+    exit 1
+  fi
+  
+  # Get current version
+  current_version="$(get_current_version)"
+  log "Current version: $current_version"
+  
+  # Get latest version
+  if ! latest_version="$(get_latest_version)"; then
+    err "Unable to check for updates. Please check your internet connection."
+    exit 1
+  fi
+  
+  log "Latest version: $latest_version"
+  
+  # Compare versions
+  if compare_versions "$current_version" "$latest_version"; then
+    log "You are already on the latest version ($latest_version)"
+    exit 0
+  fi
+  
+  # Ask for confirmation
+  echo ""
+  warn "Update available: $current_version → $latest_version"
+  echo -n "Do you want to update? [y/N]: "
+  read -r response
+  case "$response" in
+    [yY]|[yY][eE][sS])
+      ;;
+    *)
+      log "Update cancelled"
+      exit 0
+      ;;
+  esac
+  
+  # Create temporary directories
+  temp_dir="$(mktemp -d)"
+  backup_dir="$(mktemp -d)"
+  
+  # Cleanup function
+  cleanup() {
+    rm -rf "$temp_dir" "$backup_dir"
+  }
+  trap cleanup EXIT
+  
+  # Backup current installation
+  log "Backing up current installation..."
+  if ! backup_installation "$backup_dir"; then
+    err "Failed to backup current installation"
+    exit 1
+  fi
+  
+  # Update installation
+  log "Updating to $latest_version..."
+  if ! update_installation "$latest_version" "$temp_dir"; then
+    err "Update failed. Restoring previous version..."
+    restore_installation "$backup_dir"
+    err "Update failed and rollback completed. Please try again later."
+    exit 1
+  fi
+  
+  # Verify installation
+  if ! "$HOME/.local/bin/devbox" version >/dev/null 2>&1; then
+    err "Update verification failed. Restoring previous version..."
+    restore_installation "$backup_dir"
+    err "Update failed and rollback completed. Please try again later."
+    exit 1
+  fi
+  
+  log "Successfully updated to $latest_version"
+  log "Run 'devbox version' to verify the update"
+}
+
 cmd_doctor() {
   local dry_run=0
   if [[ "${1:-}" == "--dry-run" ]]; then dry_run=1; fi
@@ -171,6 +251,7 @@ case "${1:-help}" in
   shell)        shift; cmd_shell;;
   apps)         shift; cmd_apps;;
   doctor)       shift; cmd_doctor "${1:-}";;
+  update)       shift; cmd_update;;
   version)      show_version;;
   help|*)       usage;;
 esac

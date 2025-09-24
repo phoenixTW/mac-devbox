@@ -11,6 +11,7 @@ _subcmds=(
   'shell:Configure zsh/oh-my-zsh/agnoster'
   'apps:First-launch registrations'
   'doctor:Show detected versions vs config'
+  'update:Update devbox CLI to latest version'
   'version:Show version information'
   'help:Show usage'
 )

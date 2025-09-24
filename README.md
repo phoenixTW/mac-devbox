@@ -21,6 +21,7 @@ A tiny, idempotent CLI to set up your Mac (Apple Silicon) with **Homebrew**, **a
   - [Configs](#configs)
   - [CLI usage](#cli-usage)
   - [Examples](#examples)
+  - [Update CLI](#update-cli)
   - [Install locations \& PATH](#install-locations--path)
   - [Tab completion](#tab-completion)
   - [Sync \& upgrades](#sync--upgrades)
@@ -100,6 +101,7 @@ devbox [--config DIR] asdf <tool> <ver>   # install one tool@version (use 'lates
 devbox [--config DIR] shell               # zsh/oh-my-zsh/agnoster wiring (+direnv hook)
 devbox [--config DIR] apps                # first app launch for registrations (docker, forti)
 devbox [--config DIR] doctor [--dry-run]  # print configured vs installed (no system calls in --dry-run)
+devbox update                             # update devbox CLI to latest version
 devbox version                            # show version information
 devbox help
 ```
@@ -150,6 +152,51 @@ devbox doctor          # compares config vs installed
 devbox doctor --dry-run  # safe for CI, no brew/asdf calls
 ```
 
+**Update devbox CLI:**
+
+```bash
+devbox update          # check for and install latest version
+```
+
+The `update` command:
+- Checks for the latest version from GitHub releases
+- Shows current vs. available version
+- Asks for confirmation before updating
+- Only updates the CLI binary and library files (no brew/asdf installs)
+- Automatically rolls back on failure
+- Works with any existing installation (backward compatible)
+
+---
+
+## Update CLI
+
+The `devbox update` command allows you to easily update to the latest version without affecting your installed tools:
+
+```bash
+# Check for updates and update if available
+devbox update
+
+# Check current version
+devbox version
+```
+
+**Features:**
+- **Safe updates**: Only updates the CLI binary and library files
+- **No tool disruption**: Your installed brew packages and asdf tools remain unchanged
+- **Automatic rollback**: If update fails, automatically restores previous version
+- **Version tracking**: Stores version information in `~/.devbox/.version`
+- **Backward compatible**: Works with installations from any previous version
+- **Internet check**: Verifies connectivity before attempting update
+
+**Update process:**
+1. Checks internet connectivity
+2. Compares current version with latest GitHub release
+3. Shows version comparison and asks for confirmation
+4. Backs up current installation
+5. Downloads and installs latest version
+6. Verifies installation success
+7. Rolls back automatically if any step fails
+
 ---
 
 ## Install locations & PATH
@@ -197,7 +244,13 @@ devbox --completion bash
   devbox brew
   devbox asdf
   ```
-* **Upgrade devbox CLI**: re-run the installer one-liner (it overwrites `~/.local/bin/devbox` safely), or `curl` the raw `bin/devbox` manually into place.
+* **Upgrade devbox CLI**: Use the built-in update command:
+
+  ```bash
+  devbox update
+  ```
+
+  Or manually re-run the installer one-liner (it overwrites `~/.local/bin/devbox` safely), or `curl` the raw `bin/devbox` manually into place.
 
 Environment overrides supported by the installer:
 

@@ -80,6 +80,12 @@ mkdir -p "$CONFIG_DIR"
 [[ -f "$CONFIG_DIR/brew-casks.txt"    ]] || cp config.defaults/brew-casks.txt    "$CONFIG_DIR/brew-casks.txt"
 [[ -f "$CONFIG_DIR/asdf-tools.json"    ]] || cp config.defaults/asdf-tools.json    "$CONFIG_DIR/asdf-tools.json"
 
+# Store current version
+if [[ -f "lib/common.sh" ]]; then
+  current_version=$(grep 'get_version()' lib/common.sh | sed 's/.*echo "\([^"]*\)".*/\1/' 2>/dev/null || echo "unknown")
+  echo "$current_version" > "$CONFIG_DIR/.version"
+fi
+
 # Install completions
 ZSH_COMP_DIR="${ZSH_COMP_DIR:-$HOME/.zsh/completions}"
 BASH_COMP_DIR="${BASH_COMP_DIR:-$HOME/.bash_completion.d}"
