@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 
-load 'helpers/test-helpers'
+load '../helpers/test-helpers'
 
 setup() {
   setup_test_dir
@@ -148,6 +148,6 @@ teardown() {
   
   run cat "$test_file"
   assert_success "$status"
-  local line_count=$(echo "$output" | wc -l)
+  local line_count=$(echo "$output" | wc -l | tr -d ' ')
   assert_equals "1" "$line_count"
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 
-load 'helpers/test-helpers'
+load '../helpers/test-helpers'
 
 setup() {
   setup_test_dir
