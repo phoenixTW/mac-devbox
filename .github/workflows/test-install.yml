@@ -1,0 +1,166 @@
+name: Test Installation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-install:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test REF detection logic
+        run: |
+          echo "🧪 Testing REF detection logic..."
+          REPO="phoenixTW/mac-devbox"
+          DEBUG="1"
+
+          detect_ref() {
+            local detected_ref=""
+            
+            # Method 1: Try to detect from HTTP_REFERER if available
+            if [[ -n "${HTTP_REFERER:-}" ]]; then
+              detected_ref=$(echo "$HTTP_REFERER" | grep -oE "refs/tags/[^/]+" | sed "s|refs/tags/||" 2>/dev/null || true)
+              [[ "$DEBUG" == "1" ]] && echo "DEBUG: Detected REF from HTTP_REFERER: $detected_ref" >&2
+            fi
+            
+            # Method 2: Try to read from local lib/common.sh if available
+            if [[ -z "$detected_ref" && -f "lib/common.sh" ]]; then
+              detected_ref=$(grep "get_version()" lib/common.sh | sed "s/.*echo \"\([^\"]*\)\".*/\1/" 2>/dev/null || true)
+              [[ "$DEBUG" == "1" ]] && echo "DEBUG: Detected REF from lib/common.sh: $detected_ref" >&2
+            fi
+            
+            # Method 3: Fallback to latest release from GitHub API (simple approach without jq)
+            if [[ -z "$detected_ref" ]]; then
+              detected_ref=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | grep "\"tag_name\"" | sed "s/.*\"tag_name\": *\"\([^\"]*\)\".*/\1/" || echo "main")
+              [[ "$DEBUG" == "1" ]] && echo "DEBUG: Detected REF from GitHub API: $detected_ref" >&2
+            fi
+            
+            # Final fallback
+            echo "${detected_ref:-main}"
+          }
+
+          REF="${REF:-$(detect_ref)}"
+          echo "✅ Final REF: $REF"
+          echo "✅ Download URL: https://codeload.github.com/$REPO/tar.gz/$REF"
+
+          # Test URL accessibility
+          echo "Testing URL accessibility..."
+          if curl -fsSL -I "https://codeload.github.com/$REPO/tar.gz/$REF" >/dev/null 2>&1; then
+            echo "✅ URL is accessible"
+          else
+            echo "❌ URL is not accessible"
+            exit 1
+          fi
+
+      - name: Test install.sh script syntax
+        run: |
+          echo "🧪 Testing install.sh script syntax..."
+          bash -n install.sh
+          echo "✅ Script syntax is valid"
+
+
+      - name: Test one-liner installation from commit SHA
+        run: |
+          echo "🧪 Testing one-liner installation from commit SHA..."
+
+          # Set up test environment
+          export HOME="/tmp/test-devbox-oneliner"
+          export DEVBOX_CONFIG_DIR="$HOME/.devbox"
+          export BIN_DIR="$HOME/.local/bin"
+
+          # Clean up any existing test environment
+          rm -rf "$HOME"
+          mkdir -p "$HOME" "$BIN_DIR"
+
+          echo "Test environment: $HOME"
+          echo "Testing commit SHA: $GITHUB_SHA"
+          echo "Event type: $GITHUB_EVENT_NAME"
+
+          # Test the actual one-liner command using the exact commit being tested
+          # This tests the complete flow: curl -> download -> install from the exact commit
+          echo "Running one-liner installation command from commit $GITHUB_SHA..."
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixTW/mac-devbox/${GITHUB_SHA}/install.sh)"
+
+          # Verify installation
+          echo "Verifying one-liner installation from commit $GITHUB_SHA..."
+          if [[ -f "$BIN_DIR/devbox" ]]; then
+            echo "✅ devbox binary installed via one-liner from commit $GITHUB_SHA"
+          else
+            echo "❌ devbox binary not found"
+            exit 1
+          fi
+
+          if [[ -d "$DEVBOX_CONFIG_DIR" ]]; then
+            echo "✅ config directory created via one-liner from commit $GITHUB_SHA"
+            if [[ -f "$DEVBOX_CONFIG_DIR/brew-formulae.txt" ]]; then
+              echo "✅ brew-formulae.txt created"
+            else
+              echo "❌ brew-formulae.txt not found"
+              exit 1
+            fi
+            if [[ -f "$DEVBOX_CONFIG_DIR/brew-casks.txt" ]]; then
+              echo "✅ brew-casks.txt created"
+            else
+              echo "❌ brew-casks.txt not found"
+              exit 1
+            fi
+            if [[ -f "$DEVBOX_CONFIG_DIR/asdf-tools.json" ]]; then
+              echo "✅ asdf-tools.json created"
+            else
+              echo "❌ asdf-tools.json not found"
+              exit 1
+            fi
+          else
+            echo "❌ config directory not created"
+            exit 1
+          fi
+
+          # Test devbox command
+          if "$BIN_DIR/devbox" version >/dev/null 2>&1; then
+            echo "✅ devbox command works after one-liner install from commit $GITHUB_SHA"
+          else
+            echo "❌ devbox command failed"
+            exit 1
+          fi
+
+          # Test shell completions
+          if [[ -f "$HOME/.zsh/completions/_devbox" ]]; then
+            echo "✅ zsh completion installed via one-liner from commit $GITHUB_SHA"
+          else
+            echo "❌ zsh completion not found"
+            exit 1
+          fi
+
+          if [[ -f "$HOME/.bash_completion.d/devbox" ]]; then
+            echo "✅ bash completion installed via one-liner from commit $GITHUB_SHA"
+          else
+            echo "❌ bash completion not found"
+            exit 1
+          fi
+
+          # Test PATH setup
+          if grep -q "\$HOME/.local/bin" "$HOME/.zprofile" 2>/dev/null; then
+            echo "✅ PATH added to zprofile via one-liner from commit $GITHUB_SHA"
+          else
+            echo "❌ PATH not added to zprofile"
+            exit 1
+          fi
+
+          # Test zshrc modification
+          if grep -q "devbox completions" "$HOME/.zshrc" 2>/dev/null; then
+            echo "✅ zshrc modified for completions via one-liner from commit $GITHUB_SHA"
+          else
+            echo "❌ zshrc not modified for completions"
+            exit 1
+          fi
+
+          # Clean up
+          rm -rf "$HOME"
+          echo "✅ One-liner installation test from commit $GITHUB_SHA completed"
