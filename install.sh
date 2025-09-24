@@ -45,9 +45,14 @@ curl -fsSL "https://codeload.github.com/$REPO/tar.gz/$REF" -o "$TMP/src.tar.gz"
 tar -xzf "$TMP/src.tar.gz" -C "$TMP"
 cd "$TMP"/*
 
-# Install devbox binary
+# Install devbox binary and lib files
 mkdir -p "$BIN_DIR"
 install -m 0755 bin/devbox "$BIN_DIR/devbox"
+
+# Install lib directory (required by devbox binary)
+LIB_DIR="$BIN_DIR/../lib"
+mkdir -p "$LIB_DIR"
+cp -r lib/* "$LIB_DIR/"
 
 # Ensure ~/.local/bin on PATH
 if ! grep -q "\$HOME/.local/bin" "$HOME/.zprofile" 2>/dev/null; then
