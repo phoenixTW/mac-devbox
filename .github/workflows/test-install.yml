@@ -65,7 +65,6 @@ jobs:
           bash -n install.sh
           echo "✅ Script syntax is valid"
 
-
       - name: Test one-liner installation from commit SHA
         run: |
           echo "🧪 Testing one-liner installation from commit SHA..."
@@ -164,3 +163,149 @@ jobs:
           # Clean up
           rm -rf "$HOME"
           echo "✅ One-liner installation test from commit $GITHUB_SHA completed"
+
+      - name: Test end-to-end bootstrap process
+        run: |
+          echo "🧪 Testing end-to-end bootstrap process..."
+
+          # Set up test environment
+          export HOME="/tmp/test-devbox-bootstrap"
+          export DEVBOX_CONFIG_DIR="$HOME/.devbox"
+          export BIN_DIR="$HOME/.local/bin"
+
+          # Clean up any existing test environment
+          rm -rf "$HOME"
+          mkdir -p "$HOME" "$BIN_DIR"
+
+          echo "Test environment: $HOME"
+          echo "Testing commit SHA: $GITHUB_SHA"
+
+          # Install devbox using one-liner
+          echo "Installing devbox via one-liner..."
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixTW/mac-devbox/${GITHUB_SHA}/install.sh)"
+
+          # Verify installation
+          if [[ ! -f "$BIN_DIR/devbox" ]]; then
+            echo "❌ devbox binary not found"
+            exit 1
+          fi
+
+          # Set up shell environment
+          echo "Setting up shell environment..."
+          source "$HOME/.zprofile" 2>/dev/null || true
+          source "$HOME/.zshrc" 2>/dev/null || true
+
+          # Verify devbox is accessible
+          if ! command -v devbox >/dev/null 2>&1; then
+            echo "❌ devbox command not found in PATH"
+            echo "PATH: $PATH"
+            exit 1
+          fi
+
+          echo "✅ devbox is accessible in shell environment"
+
+          # Run bootstrap with timeout (15 minutes)
+          echo "Running devbox bootstrap (with 15-minute timeout)..."
+          if timeout 900 "$BIN_DIR/devbox" bootstrap; then
+            echo "✅ devbox bootstrap completed successfully"
+          else
+            bootstrap_exit_code=$?
+            if [[ $bootstrap_exit_code -eq 124 ]]; then
+              echo "❌ devbox bootstrap timed out after 15 minutes"
+              exit 1
+            else
+              echo "❌ devbox bootstrap failed with exit code: $bootstrap_exit_code"
+              exit 1
+            fi
+          fi
+
+          # Verify Homebrew installation (user-scoped)
+          echo "Verifying user-scoped Homebrew installation..."
+          if [[ -d "$HOME/.homebrew" && -x "$HOME/.homebrew/bin/brew" ]]; then
+            echo "✅ Homebrew installed in user directory: $HOME/.homebrew"
+            
+            # Check that brew works
+            if "$HOME/.homebrew/bin/brew" --version >/dev/null 2>&1; then
+              echo "✅ Homebrew is functional"
+            else
+              echo "❌ Homebrew binary not functional"
+              exit 1
+            fi
+            
+            # Verify no sudo was required (check ownership)
+            if [[ "$(stat -f '%Su' "$HOME/.homebrew" 2>/dev/null || stat -c '%U' "$HOME/.homebrew" 2>/dev/null)" == "$(whoami)" ]]; then
+              echo "✅ Homebrew directory owned by current user (no sudo required)"
+            else
+              echo "❌ Homebrew directory not owned by current user"
+              exit 1
+            fi
+          else
+            echo "❌ Homebrew not found in user directory"
+            exit 1
+          fi
+
+          # Verify basic packages are installed
+          echo "Verifying basic package installation..."
+          if "$HOME/.homebrew/bin/brew" list --formula | grep -q "git"; then
+            echo "✅ git formula installed"
+          else
+            echo "❌ git formula not installed"
+            exit 1
+          fi
+
+          if "$HOME/.homebrew/bin/brew" list --formula | grep -q "curl"; then
+            echo "✅ curl formula installed"
+          else
+            echo "❌ curl formula not installed"
+            exit 1
+          fi
+
+          if "$HOME/.homebrew/bin/brew" list --formula | grep -q "jq"; then
+            echo "✅ jq formula installed"
+          else
+            echo "❌ jq formula not installed"
+            exit 1
+          fi
+
+          # Verify asdf is working
+          echo "Verifying asdf installation..."
+          if command -v asdf >/dev/null 2>&1; then
+            echo "✅ asdf command available"
+            if asdf version >/dev/null 2>&1; then
+              echo "✅ asdf is functional"
+            else
+              echo "❌ asdf not functional"
+              exit 1
+            fi
+          else
+            echo "❌ asdf command not found"
+            exit 1
+          fi
+
+          # Verify shell configuration
+          echo "Verifying shell configuration..."
+          if [[ -d "$HOME/.oh-my-zsh" ]]; then
+            echo "✅ oh-my-zsh installed"
+          else
+            echo "❌ oh-my-zsh not installed"
+            exit 1
+          fi
+
+          if grep -q "agnoster" "$HOME/.zshrc" 2>/dev/null; then
+            echo "✅ agnoster theme configured"
+          else
+            echo "❌ agnoster theme not configured"
+            exit 1
+          fi
+
+          # Verify PATH configuration
+          if grep -q "\.local/bin" "$HOME/.zprofile" 2>/dev/null; then
+            echo "✅ PATH configured in .zprofile"
+          else
+            echo "❌ PATH not configured in .zprofile"
+            exit 1
+          fi
+
+          # Clean up
+          rm -rf "$HOME"
+          echo "✅ End-to-end bootstrap test completed successfully"
