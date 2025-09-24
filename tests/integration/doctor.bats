@@ -19,8 +19,12 @@ teardown() {
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Load common functions
-. "$(dirname "$0")/../../lib/common.sh"
+# Mock functions for testing
+brew_formulae_file() { echo "$TEST_CONFIG_DIR/brew-formulae.txt"; }
+brew_casks_file() { echo "$TEST_CONFIG_DIR/brew-casks.txt"; }
+asdf_tools_file() { echo "$TEST_CONFIG_DIR/asdf-tools.json"; }
+json_keys() { jq -r 'keys[]' "$1"; }
+json_read_k() { jq -r ".\"$2\"" "$1"; }
 
 # Mock doctor command
 cmd_doctor() {
@@ -93,7 +97,12 @@ EOF
 #!/usr/bin/env bash
 set -euo pipefail
 
-. "$(dirname "$0")/../../lib/common.sh"
+# Mock functions for testing
+brew_formulae_file() { echo "$TEST_CONFIG_DIR/brew-formulae.txt"; }
+brew_casks_file() { echo "$TEST_CONFIG_DIR/brew-casks.txt"; }
+asdf_tools_file() { echo "$TEST_CONFIG_DIR/asdf-tools.json"; }
+json_keys() { jq -r 'keys[]' "$1"; }
+json_read_k() { jq -r ".\"$2\"" "$1"; }
 
 cmd_doctor() {
   local dry_run=0
