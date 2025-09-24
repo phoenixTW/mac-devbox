@@ -38,7 +38,12 @@ A tiny, idempotent CLI to set up your Mac (Apple Silicon) with **Homebrew**, **a
 **One-liner install** (installs CLI, seeds configs, installs completions):
 
 ```bash
+# Install latest release (recommended)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixTW/mac-devbox/refs/tags/0.0.1/install.sh)"
+
+# Or install from main branch (development)
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixTW/mac-devbox/main/install.sh)"
+
 # start using devbox (new terminal or:)
 source ~/.zprofile
 source ~/.zshrc 2>/dev/null || true
@@ -197,14 +202,14 @@ devbox --completion bash
 Environment overrides supported by the installer:
 
 * `REPO` (default: `phoenixTW/mac-devbox`)
-* `REF` (default: `main`)
+* `REF` (auto-detected from source, fallback to latest release)
 * `DEVBOX_CONFIG_DIR`, `ZSH_COMP_DIR`, `BASH_COMP_DIR`
+* `DEVBOX_DEBUG` (set to `1` for debug output, hidden from users)
 
-Example (pin to a tag):
+Example (pin to a specific version):
 
 ```bash
-REPO=phoenixTW/mac-devbox REF=v1.0.0 \
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixTW/mac-devbox/v1.0.0/install.sh)"
+REF=0.0.1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixTW/mac-devbox/refs/tags/0.0.1/install.sh)"
 ```
 
 ---
