@@ -1,3 +1,11 @@
+# ## 0.0.4
+
+
+#### Other Changes
+
+* [#7](https://github.com/phoenixTW/mac-devbox/pull/7): patch: Fixed devbox permission and brew.sh.
+
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
