@@ -5,7 +5,7 @@ _devbox_complete() {
   COMPREPLY=()
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
-  subcmds="bootstrap brew asdf shell apps doctor version help --config"
+  subcmds="bootstrap brew asdf shell apps doctor update version help --config"
 
   if [[ $COMP_CWORD -eq 1 ]]; then
     COMPREPLY=( $(compgen -W "$subcmds" -- "$cur") )
