@@ -14,6 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     # Only run on push to main or when PR is merged to main
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+
+    outputs:
+      version: ${{ steps.version.outputs.new_version }}
     permissions:
       contents: write
       pull-requests: read
@@ -35,13 +38,9 @@ jobs:
         uses: saadmk11/changelog-ci@v1.2.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          release_version: ${{ steps.version.outputs.version }}
+          release_version: ${{ steps.set_version.outputs.new_version }}
           changelog_filename: CHANGELOG.md
           config_file: .changelog-ci.json
-
-      - name: Set version output
-        run: |
-          echo "version=${{ steps.version.outputs.version }}" >> $GITHUB_OUTPUT
 
   release:
     runs-on: ubuntu-latest
