@@ -313,16 +313,101 @@ jobs:
           rm -rf "$HOME"
           echo "✅ PATH setup test completed"
 
-      - name: Final verification
+      - name: Test one-liner installation from commit SHA
         run: |
-          echo "🎉 All installation tests passed!"
-          echo "✅ REF detection logic works"
-          echo "✅ Script syntax is valid"
-          echo "✅ Main branch installation works"
-          echo "✅ Release tag installation works"
-          echo "✅ Explicit REF override works"
-          echo "✅ Debug mode works"
-          echo "✅ Shell completions work"
-          echo "✅ PATH setup works"
-          echo ""
-          echo "🚀 Installation is ready for release!"
+          echo "🧪 Testing one-liner installation from commit SHA..."
+
+          # Set up test environment
+          export HOME="/tmp/test-devbox-oneliner"
+          export DEVBOX_CONFIG_DIR="$HOME/.devbox"
+          export BIN_DIR="$HOME/.local/bin"
+
+          # Clean up any existing test environment
+          rm -rf "$HOME"
+          mkdir -p "$HOME" "$BIN_DIR"
+
+          echo "Test environment: $HOME"
+          echo "Testing commit SHA: $GITHUB_SHA"
+          echo "Event type: $GITHUB_EVENT_NAME"
+
+          # Test the actual one-liner command using the exact commit being tested
+          # This tests the complete flow: curl -> download -> install from the exact commit
+          echo "Running one-liner installation command from commit $GITHUB_SHA..."
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixTW/mac-devbox/${GITHUB_SHA}/install.sh)"
+
+          # Verify installation
+          echo "Verifying one-liner installation from commit $GITHUB_SHA..."
+          if [[ -f "$BIN_DIR/devbox" ]]; then
+            echo "✅ devbox binary installed via one-liner from commit $GITHUB_SHA"
+          else
+            echo "❌ devbox binary not found"
+            exit 1
+          fi
+
+          if [[ -d "$DEVBOX_CONFIG_DIR" ]]; then
+            echo "✅ config directory created via one-liner from commit $GITHUB_SHA"
+            if [[ -f "$DEVBOX_CONFIG_DIR/brew-formulae.txt" ]]; then
+              echo "✅ brew-formulae.txt created"
+            else
+              echo "❌ brew-formulae.txt not found"
+              exit 1
+            fi
+            if [[ -f "$DEVBOX_CONFIG_DIR/brew-casks.txt" ]]; then
+              echo "✅ brew-casks.txt created"
+            else
+              echo "❌ brew-casks.txt not found"
+              exit 1
+            fi
+            if [[ -f "$DEVBOX_CONFIG_DIR/asdf-tools.json" ]]; then
+              echo "✅ asdf-tools.json created"
+            else
+              echo "❌ asdf-tools.json not found"
+              exit 1
+            fi
+          else
+            echo "❌ config directory not created"
+            exit 1
+          fi
+
+          # Test devbox command
+          if "$BIN_DIR/devbox" version >/dev/null 2>&1; then
+            echo "✅ devbox command works after one-liner install from commit $GITHUB_SHA"
+          else
+            echo "❌ devbox command failed"
+            exit 1
+          fi
+
+          # Test shell completions
+          if [[ -f "$HOME/.zsh/completions/_devbox" ]]; then
+            echo "✅ zsh completion installed via one-liner from commit $GITHUB_SHA"
+          else
+            echo "❌ zsh completion not found"
+            exit 1
+          fi
+
+          if [[ -f "$HOME/.bash_completion.d/devbox" ]]; then
+            echo "✅ bash completion installed via one-liner from commit $GITHUB_SHA"
+          else
+            echo "❌ bash completion not found"
+            exit 1
+          fi
+
+          # Test PATH setup
+          if grep -q "\$HOME/.local/bin" "$HOME/.zprofile" 2>/dev/null; then
+            echo "✅ PATH added to zprofile via one-liner from commit $GITHUB_SHA"
+          else
+            echo "❌ PATH not added to zprofile"
+            exit 1
+          fi
+
+          # Test zshrc modification
+          if grep -q "devbox completions" "$HOME/.zshrc" 2>/dev/null; then
+            echo "✅ zshrc modified for completions via one-liner from commit $GITHUB_SHA"
+          else
+            echo "❌ zshrc not modified for completions"
+            exit 1
+          fi
+
+          # Clean up
+          rm -rf "$HOME"
+          echo "✅ One-liner installation test from commit $GITHUB_SHA completed"
