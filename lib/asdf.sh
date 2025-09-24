@@ -63,8 +63,40 @@ asdf_install_tool() {
   fi
 
   # set global if not already
-  if [[ "$(asdf current "$name" 2>/dev/null | awk '{print $2}')" != "$version" ]]; then
-    asdf global "$name" "$version"
+  local current_version
+  current_version="$(asdf current "$name" 2>/dev/null | awk '{print $2}' || echo "")"
+  if [[ "$current_version" != "$version" ]]; then
+    log "asdf global $name $version"
+    # Check if asdf global command is available
+    if asdf help global >/dev/null 2>&1; then
+      if ! asdf global "$name" "$version" 2>/dev/null; then
+        warn "Failed to set global version for $name using 'asdf global', trying alternative method"
+        # Fallback: write directly to .tool-versions file
+        local tool_versions_file="$HOME/.tool-versions"
+        if [[ -f "$tool_versions_file" ]]; then
+          # Remove existing entry and add new one
+          grep -v "^$name " "$tool_versions_file" > "$tool_versions_file.tmp" 2>/dev/null || true
+          echo "$name $version" >> "$tool_versions_file.tmp"
+          mv "$tool_versions_file.tmp" "$tool_versions_file"
+        else
+          echo "$name $version" > "$tool_versions_file"
+        fi
+        log "Set $name version to $version via .tool-versions file"
+      fi
+    else
+      warn "asdf global command not available, using .tool-versions file method"
+      # Fallback: write directly to .tool-versions file
+      local tool_versions_file="$HOME/.tool-versions"
+      if [[ -f "$tool_versions_file" ]]; then
+        # Remove existing entry and add new one
+        grep -v "^$name " "$tool_versions_file" > "$tool_versions_file.tmp" 2>/dev/null || true
+        echo "$name $version" >> "$tool_versions_file.tmp"
+        mv "$tool_versions_file.tmp" "$tool_versions_file"
+      else
+        echo "$name $version" > "$tool_versions_file"
+      fi
+      log "Set $name version to $version via .tool-versions file"
+    fi
   fi
 
   asdf reshim
