@@ -1,3 +1,11 @@
+# ## 0.0.2
+
+
+#### Other Changes
+
+* [#4](https://github.com/phoenixTW/mac-devbox/pull/4): patch: Fixed installation issue due to REF.
+
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
