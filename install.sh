@@ -32,7 +32,13 @@ detect_ref() {
   echo "${detected_ref:-main}"
 }
 
-REF="${REF:-$(detect_ref)}"
+# If we're running from a commit SHA (detected by checking if we're in a git repo with a commit SHA)
+if [[ -n "${GITHUB_SHA:-}" ]]; then
+  REF="${REF:-$GITHUB_SHA}"
+  [[ "$DEBUG" == "1" ]] && echo "DEBUG: Using GITHUB_SHA as REF: $REF" >&2
+else
+  REF="${REF:-$(detect_ref)}"
+fi
 CONFIG_DIR="${DEVBOX_CONFIG_DIR:-$HOME/.devbox}"
 BIN_DIR="$HOME/.local/bin"
 
@@ -43,7 +49,13 @@ trap cleanup EXIT
 echo "Fetching $REPO@$REF..."
 curl -fsSL "https://codeload.github.com/$REPO/tar.gz/$REF" -o "$TMP/src.tar.gz"
 tar -xzf "$TMP/src.tar.gz" -C "$TMP"
-cd "$TMP"/*
+# Find the extracted directory (should be the only one)
+EXTRACTED_DIR=$(find "$TMP" -maxdepth 1 -type d -name "*" | grep -v "^$TMP$" | head -1)
+if [[ -z "$EXTRACTED_DIR" ]]; then
+  echo "❌ Failed to find extracted directory"
+  exit 1
+fi
+cd "$EXTRACTED_DIR"
 
 # Install devbox binary and lib files
 mkdir -p "$BIN_DIR"
