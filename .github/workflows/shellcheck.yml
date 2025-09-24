@@ -1,8 +1,16 @@
 name: ShellCheck
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
+    branches:
+      - main
   pull_request:
+    branches:
+      - main
 
 jobs:
   shellcheck:
@@ -13,6 +21,6 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Run ShellCheck
         run: |
-          shellcheck bin/devbox
+          shellcheck -x bin/devbox
           shellcheck lib/*.sh
           shellcheck install.sh

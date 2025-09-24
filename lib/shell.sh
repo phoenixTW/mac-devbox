@@ -35,7 +35,7 @@ install_oh_my_zsh() {
       echo "export ZSH=\"$ZSH_DIR\""
       echo 'ZSH_THEME="agnoster"'
       echo 'plugins=(git asdf direnv)'
-      echo 'source $ZSH/oh-my-zsh.sh'
+      echo "source \$ZSH/oh-my-zsh.sh"
       echo '# <<< managed by devbox'
     } >> "$ZSHRC"
   fi

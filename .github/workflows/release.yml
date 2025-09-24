@@ -1,11 +1,11 @@
 name: Release
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    types: [closed]
     branches:
       - main
 
