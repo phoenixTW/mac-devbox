@@ -5,18 +5,33 @@ set -euo pipefail
 
 install_homebrew() {
   if ! exists brew; then
-    log "Installing Homebrew…"
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  fi
-
-  if [[ -x /opt/homebrew/bin/brew ]]; then
-    eval "$(/opt/homebrew/bin/brew shellenv)"
+    log "Installing Homebrew to user directory (no sudo required)…"
+    
+    # Install Homebrew to user directory
+    local homebrew_dir="$HOME/.homebrew"
+    mkdir -p "$homebrew_dir"
+    
+    # Download and extract Homebrew
+    curl -fsSL https://github.com/Homebrew/brew/tarball/main | tar xz --strip-components 1 -C "$homebrew_dir"
+    
+    # Set up environment
+    eval "$("$homebrew_dir/bin/brew" shellenv)"
+    
     # Ensure brew for login shells
     if ! grep -q 'brew shellenv' "$ZPROFILE" 2>/dev/null; then
-      printf '\n%s\n' "eval \"\$(/opt/homebrew/bin/brew shellenv)\"" >> "$ZPROFILE"
+      printf '\n%s\n' "eval \"\$(\"$homebrew_dir/bin/brew\" shellenv)\"" >> "$ZPROFILE"
     fi
+    
+    # Initialize Homebrew
+    brew update --force --quiet
+    chmod -R go-w "$(brew --prefix)/share/zsh" 2>/dev/null || true
   else
-    die "Homebrew not found at /opt/homebrew"
+    # If brew already exists, ensure it's in PATH
+    if [[ -x "$HOME/.homebrew/bin/brew" ]]; then
+      eval "$("$HOME/.homebrew/bin/brew" shellenv)"
+    elif [[ -x /opt/homebrew/bin/brew ]]; then
+      eval "$(/opt/homebrew/bin/brew shellenv)"
+    fi
   fi
 }
 
