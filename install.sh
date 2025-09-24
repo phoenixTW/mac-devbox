@@ -40,7 +40,7 @@ TMP="$(mktemp -d)"
 cleanup(){ rm -rf "$TMP"; }
 trap cleanup EXIT
 
-echo "Fetching $REPO@$REF…"
+echo "Fetching $REPO@$REF..."
 curl -fsSL "https://codeload.github.com/$REPO/tar.gz/$REF" -o "$TMP/src.tar.gz"
 tar -xzf "$TMP/src.tar.gz" -C "$TMP"
 cd "$TMP"/*
