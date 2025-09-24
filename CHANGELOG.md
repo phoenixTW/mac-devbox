@@ -1,3 +1,13 @@
+# ## 0.0.1
+
+
+#### Other Changes
+
+* [#1](https://github.com/phoenixTW/mac-devbox/pull/1): feat: Updated workflows with concurrency.
+* [#2](https://github.com/phoenixTW/mac-devbox/pull/2): patch: Fixed release version GHA.
+* [#3](https://github.com/phoenixTW/mac-devbox/pull/3): patch: Fixed release version GHA for changelog.
+
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
