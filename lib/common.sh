@@ -14,7 +14,7 @@ exists()   { command -v "$1" >/dev/null 2>&1; }
 require_cmd() { exists "$1" || die "Required command '$1' not found"; }
 
 # --- Version information -----------------------------------------------------
-get_version() { echo "0.0.2"; }
+get_version() { echo "0.0.3"; }
 show_version() { echo "devbox version $(get_version)"; }
 
 # --- Basic security validation -----------------------------------------------
