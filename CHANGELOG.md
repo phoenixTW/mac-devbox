@@ -1,3 +1,12 @@
+# ## 0.0.3
+
+
+#### Other Changes
+
+* [#5](https://github.com/phoenixTW/mac-devbox/pull/5): patch: Fixed test installation.
+* [#6](https://github.com/phoenixTW/mac-devbox/pull/6): patch: Fixed main branch test install.
+
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
