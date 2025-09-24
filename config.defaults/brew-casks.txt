@@ -2,6 +2,6 @@ notion
 docker
 cursor
 arc
-forticlient-vpn
+openfortivpn
 warp
 font-meslo-lg-nerd-font
