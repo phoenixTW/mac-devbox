@@ -42,9 +42,93 @@ jobs:
           changelog_filename: CHANGELOG.md
           config_file: .changelog-ci.json
 
+  test-install:
+    runs-on: macos-latest
+    # Only run on push to main or when PR is merged to main
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test REF detection logic
+        run: |
+          echo "🧪 Testing REF detection logic..."
+          REPO="phoenixTW/mac-devbox"
+          DEBUG="1"
+
+          detect_ref() {
+            local detected_ref=""
+            
+            if [[ -n "${HTTP_REFERER:-}" ]]; then
+              detected_ref=$(echo "$HTTP_REFERER" | grep -oE "refs/tags/[^/]+" | sed "s|refs/tags/||" 2>/dev/null || true)
+              [[ "$DEBUG" == "1" ]] && echo "DEBUG: Detected REF from HTTP_REFERER: $detected_ref" >&2
+            fi
+            
+            if [[ -z "$detected_ref" && -f "lib/common.sh" ]]; then
+              detected_ref=$(grep "get_version()" lib/common.sh | sed "s/.*echo \"\([^\"]*\)\".*/\1/" 2>/dev/null || true)
+              [[ "$DEBUG" == "1" ]] && echo "DEBUG: Detected REF from lib/common.sh: $detected_ref" >&2
+            fi
+            
+            if [[ -z "$detected_ref" ]]; then
+              detected_ref=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | grep "\"tag_name\"" | sed "s/.*\"tag_name\": *\"\([^\"]*\)\".*/\1/" || echo "main")
+              [[ "$DEBUG" == "1" ]] && echo "DEBUG: Detected REF from GitHub API: $detected_ref" >&2
+            fi
+            
+            echo "${detected_ref:-main}"
+          }
+
+          REF="${REF:-$(detect_ref)}"
+          echo "✅ Final REF: $REF"
+          echo "✅ Download URL: https://codeload.github.com/$REPO/tar.gz/$REF"
+
+          if curl -fsSL -I "https://codeload.github.com/$REPO/tar.gz/$REF" >/dev/null 2>&1; then
+            echo "✅ URL is accessible"
+          else
+            echo "❌ URL is not accessible"
+            exit 1
+          fi
+
+      - name: Test installation from release tag
+        run: |
+          echo "🧪 Testing installation from release tag..."
+
+          export HOME="/tmp/test-devbox-tag"
+          export DEVBOX_CONFIG_DIR="$HOME/.devbox"
+          export BIN_DIR="$HOME/.local/bin"
+
+          rm -rf "$HOME"
+          mkdir -p "$HOME" "$BIN_DIR"
+
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixTW/mac-devbox/refs/tags/0.0.1/install.sh)"
+
+          if [[ -f "$BIN_DIR/devbox" ]]; then
+            echo "✅ devbox binary installed"
+          else
+            echo "❌ devbox binary not found"
+            exit 1
+          fi
+
+          if [[ -d "$DEVBOX_CONFIG_DIR" ]]; then
+            echo "✅ config directory created"
+          else
+            echo "❌ config directory not created"
+            exit 1
+          fi
+
+          if "$BIN_DIR/devbox" version >/dev/null 2>&1; then
+            echo "✅ devbox command works"
+          else
+            echo "❌ devbox command failed"
+            exit 1
+          fi
+
+          rm -rf "$HOME"
+          echo "✅ Installation test completed"
+
   release:
     runs-on: ubuntu-latest
-    needs: changelog
+    needs: [changelog, test-install]
     # Only run on push to main or when PR is merged to main
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     permissions:

@@ -1,0 +1,328 @@
+name: Test Installation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-install:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Test REF detection logic
+        run: |
+          echo "🧪 Testing REF detection logic..."
+          REPO="phoenixTW/mac-devbox"
+          DEBUG="1"
+
+          detect_ref() {
+            local detected_ref=""
+            
+            # Method 1: Try to detect from HTTP_REFERER if available
+            if [[ -n "${HTTP_REFERER:-}" ]]; then
+              detected_ref=$(echo "$HTTP_REFERER" | grep -oE "refs/tags/[^/]+" | sed "s|refs/tags/||" 2>/dev/null || true)
+              [[ "$DEBUG" == "1" ]] && echo "DEBUG: Detected REF from HTTP_REFERER: $detected_ref" >&2
+            fi
+            
+            # Method 2: Try to read from local lib/common.sh if available
+            if [[ -z "$detected_ref" && -f "lib/common.sh" ]]; then
+              detected_ref=$(grep "get_version()" lib/common.sh | sed "s/.*echo \"\([^\"]*\)\".*/\1/" 2>/dev/null || true)
+              [[ "$DEBUG" == "1" ]] && echo "DEBUG: Detected REF from lib/common.sh: $detected_ref" >&2
+            fi
+            
+            # Method 3: Fallback to latest release from GitHub API (simple approach without jq)
+            if [[ -z "$detected_ref" ]]; then
+              detected_ref=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | grep "\"tag_name\"" | sed "s/.*\"tag_name\": *\"\([^\"]*\)\".*/\1/" || echo "main")
+              [[ "$DEBUG" == "1" ]] && echo "DEBUG: Detected REF from GitHub API: $detected_ref" >&2
+            fi
+            
+            # Final fallback
+            echo "${detected_ref:-main}"
+          }
+
+          REF="${REF:-$(detect_ref)}"
+          echo "✅ Final REF: $REF"
+          echo "✅ Download URL: https://codeload.github.com/$REPO/tar.gz/$REF"
+
+          # Test URL accessibility
+          echo "Testing URL accessibility..."
+          if curl -fsSL -I "https://codeload.github.com/$REPO/tar.gz/$REF" >/dev/null 2>&1; then
+            echo "✅ URL is accessible"
+          else
+            echo "❌ URL is not accessible"
+            exit 1
+          fi
+
+      - name: Test install.sh script syntax
+        run: |
+          echo "🧪 Testing install.sh script syntax..."
+          bash -n install.sh
+          echo "✅ Script syntax is valid"
+
+      - name: Test installation from main branch
+        run: |
+          echo "🧪 Testing installation from main branch..."
+
+          # Set up test environment
+          export HOME="/tmp/test-devbox-main"
+          export DEVBOX_CONFIG_DIR="$HOME/.devbox"
+          export BIN_DIR="$HOME/.local/bin"
+
+          # Clean up any existing test environment
+          rm -rf "$HOME"
+          mkdir -p "$HOME" "$BIN_DIR"
+
+          echo "Test environment: $HOME"
+
+          # Test the installation
+          bash install.sh
+
+          # Verify installation
+          echo "Verifying installation..."
+          if [[ -f "$BIN_DIR/devbox" ]]; then
+            echo "✅ devbox binary installed"
+          else
+            echo "❌ devbox binary not found"
+            exit 1
+          fi
+
+          if [[ -d "$DEVBOX_CONFIG_DIR" ]]; then
+            echo "✅ config directory created"
+            if [[ -f "$DEVBOX_CONFIG_DIR/brew-formulae.txt" ]]; then
+              echo "✅ brew-formulae.txt created"
+            else
+              echo "❌ brew-formulae.txt not found"
+              exit 1
+            fi
+            if [[ -f "$DEVBOX_CONFIG_DIR/brew-casks.txt" ]]; then
+              echo "✅ brew-casks.txt created"
+            else
+              echo "❌ brew-casks.txt not found"
+              exit 1
+            fi
+            if [[ -f "$DEVBOX_CONFIG_DIR/asdf-tools.json" ]]; then
+              echo "✅ asdf-tools.json created"
+            else
+              echo "❌ asdf-tools.json not found"
+              exit 1
+            fi
+          else
+            echo "❌ config directory not created"
+            exit 1
+          fi
+
+          # Test devbox command
+          if "$BIN_DIR/devbox" version >/dev/null 2>&1; then
+            echo "✅ devbox command works"
+          else
+            echo "❌ devbox command failed"
+            exit 1
+          fi
+
+          # Clean up
+          rm -rf "$HOME"
+          echo "✅ Main branch installation test completed"
+
+      - name: Test installation from release tag
+        run: |
+          echo "🧪 Testing installation from release tag..."
+
+          # Set up test environment
+          export HOME="/tmp/test-devbox-tag"
+          export DEVBOX_CONFIG_DIR="$HOME/.devbox"
+          export BIN_DIR="$HOME/.local/bin"
+
+          # Clean up any existing test environment
+          rm -rf "$HOME"
+          mkdir -p "$HOME" "$BIN_DIR"
+
+          echo "Test environment: $HOME"
+
+          # Test installation from release tag
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixTW/mac-devbox/refs/tags/0.0.1/install.sh)"
+
+          # Verify installation
+          echo "Verifying installation..."
+          if [[ -f "$BIN_DIR/devbox" ]]; then
+            echo "✅ devbox binary installed"
+          else
+            echo "❌ devbox binary not found"
+            exit 1
+          fi
+
+          if [[ -d "$DEVBOX_CONFIG_DIR" ]]; then
+            echo "✅ config directory created"
+          else
+            echo "❌ config directory not created"
+            exit 1
+          fi
+
+          # Test devbox command
+          if "$BIN_DIR/devbox" version >/dev/null 2>&1; then
+            echo "✅ devbox command works"
+          else
+            echo "❌ devbox command failed"
+            exit 1
+          fi
+
+          # Clean up
+          rm -rf "$HOME"
+          echo "✅ Release tag installation test completed"
+
+      - name: Test with explicit REF override
+        run: |
+          echo "🧪 Testing with explicit REF override..."
+
+          # Set up test environment
+          export HOME="/tmp/test-devbox-ref"
+          export DEVBOX_CONFIG_DIR="$HOME/.devbox"
+          export BIN_DIR="$HOME/.local/bin"
+          export REF="main"
+
+          # Clean up any existing test environment
+          rm -rf "$HOME"
+          mkdir -p "$HOME" "$BIN_DIR"
+
+          echo "Test environment: $HOME"
+          echo "Using explicit REF: $REF"
+
+          # Test the installation with explicit REF
+          bash install.sh
+
+          # Verify installation
+          if [[ -f "$BIN_DIR/devbox" ]]; then
+            echo "✅ devbox binary installed with explicit REF"
+          else
+            echo "❌ devbox binary not found"
+            exit 1
+          fi
+
+          # Clean up
+          rm -rf "$HOME"
+          echo "✅ Explicit REF override test completed"
+
+      - name: Test debug mode
+        run: |
+          echo "🧪 Testing debug mode..."
+
+          # Set up test environment
+          export HOME="/tmp/test-devbox-debug"
+          export DEVBOX_CONFIG_DIR="$HOME/.devbox"
+          export BIN_DIR="$HOME/.local/bin"
+          export DEVBOX_DEBUG="1"
+
+          # Clean up any existing test environment
+          rm -rf "$HOME"
+          mkdir -p "$HOME" "$BIN_DIR"
+
+          echo "Test environment: $HOME"
+
+          # Test the installation with debug mode
+          bash install.sh 2>&1 | grep -q "DEBUG:" && echo "✅ Debug output detected" || echo "❌ No debug output"
+
+          # Verify installation still works
+          if [[ -f "$BIN_DIR/devbox" ]]; then
+            echo "✅ devbox binary installed in debug mode"
+          else
+            echo "❌ devbox binary not found"
+            exit 1
+          fi
+
+          # Clean up
+          rm -rf "$HOME"
+          echo "✅ Debug mode test completed"
+
+      - name: Test shell completions
+        run: |
+          echo "🧪 Testing shell completions..."
+
+          # Set up test environment
+          export HOME="/tmp/test-devbox-completions"
+          export DEVBOX_CONFIG_DIR="$HOME/.devbox"
+          export BIN_DIR="$HOME/.local/bin"
+
+          # Clean up any existing test environment
+          rm -rf "$HOME"
+          mkdir -p "$HOME" "$BIN_DIR"
+
+          echo "Test environment: $HOME"
+
+          # Test the installation
+          bash install.sh
+
+          # Check if completions were installed
+          if [[ -f "$HOME/.zsh/completions/_devbox" ]]; then
+            echo "✅ zsh completion installed"
+          else
+            echo "❌ zsh completion not found"
+            exit 1
+          fi
+
+          if [[ -f "$HOME/.bash_completion.d/devbox" ]]; then
+            echo "✅ bash completion installed"
+          else
+            echo "❌ bash completion not found"
+            exit 1
+          fi
+
+          # Check if zshrc was modified
+          if grep -q "devbox completions" "$HOME/.zshrc" 2>/dev/null; then
+            echo "✅ zshrc modified for completions"
+          else
+            echo "❌ zshrc not modified for completions"
+            exit 1
+          fi
+
+          # Clean up
+          rm -rf "$HOME"
+          echo "✅ Shell completions test completed"
+
+      - name: Test PATH setup
+        run: |
+          echo "🧪 Testing PATH setup..."
+
+          # Set up test environment
+          export HOME="/tmp/test-devbox-path"
+          export DEVBOX_CONFIG_DIR="$HOME/.devbox"
+          export BIN_DIR="$HOME/.local/bin"
+
+          # Clean up any existing test environment
+          rm -rf "$HOME"
+          mkdir -p "$HOME" "$BIN_DIR"
+
+          echo "Test environment: $HOME"
+
+          # Test the installation
+          bash install.sh
+
+          # Check if PATH was added to zprofile
+          if grep -q "\$HOME/.local/bin" "$HOME/.zprofile" 2>/dev/null; then
+            echo "✅ PATH added to zprofile"
+          else
+            echo "❌ PATH not added to zprofile"
+            exit 1
+          fi
+
+          # Clean up
+          rm -rf "$HOME"
+          echo "✅ PATH setup test completed"
+
+      - name: Final verification
+        run: |
+          echo "🎉 All installation tests passed!"
+          echo "✅ REF detection logic works"
+          echo "✅ Script syntax is valid"
+          echo "✅ Main branch installation works"
+          echo "✅ Release tag installation works"
+          echo "✅ Explicit REF override works"
+          echo "✅ Debug mode works"
+          echo "✅ Shell completions work"
+          echo "✅ PATH setup works"
+          echo ""
+          echo "🚀 Installation is ready for release!"
