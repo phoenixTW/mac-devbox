@@ -179,6 +179,8 @@ jobs:
 
           echo "Test environment: $HOME"
           echo "Testing commit SHA: $GITHUB_SHA"
+          echo "Current PATH: $PATH"
+          echo "Current shell: $SHELL"
 
           # Install devbox using one-liner
           echo "Installing devbox via one-liner..."
@@ -192,28 +194,59 @@ jobs:
 
           # Set up shell environment
           echo "Setting up shell environment..."
-          source "$HOME/.zprofile" 2>/dev/null || true
-          source "$HOME/.zshrc" 2>/dev/null || true
+          # Check if files exist before sourcing
+          if [[ -f "$HOME/.zprofile" ]]; then
+            echo "Sourcing .zprofile..."
+            . "$HOME/.zprofile" 2>/dev/null || echo "Warning: Failed to source .zprofile"
+          else
+            echo "Warning: .zprofile not found"
+          fi
 
-          # Verify devbox is accessible
+          if [[ -f "$HOME/.zshrc" ]]; then
+            echo "Sourcing .zshrc..."
+            . "$HOME/.zshrc" 2>/dev/null || echo "Warning: Failed to source .zshrc"
+          else
+            echo "Warning: .zshrc not found"
+          fi
+
+          # Ensure devbox is in PATH (fallback if shell files failed)
           if ! command -v devbox >/dev/null 2>&1; then
-            echo "❌ devbox command not found in PATH"
-            echo "PATH: $PATH"
-            exit 1
+            echo "devbox not in PATH, adding manually..."
+            export PATH="$HOME/.local/bin:$PATH"
+            if ! command -v devbox >/dev/null 2>&1; then
+              echo "❌ devbox command not found in PATH"
+              echo "PATH: $PATH"
+              echo "BIN_DIR: $BIN_DIR"
+              echo "devbox binary exists: $([[ -f "$BIN_DIR/devbox" ]] && echo "yes" || echo "no")"
+              exit 1
+            fi
           fi
 
           echo "✅ devbox is accessible in shell environment"
 
           # Run bootstrap with timeout (15 minutes)
           echo "Running devbox bootstrap (with 15-minute timeout)..."
-          if timeout 900 "$BIN_DIR/devbox" bootstrap; then
-            echo "✅ devbox bootstrap completed successfully"
-          else
-            bootstrap_exit_code=$?
-            if [[ $bootstrap_exit_code -eq 124 ]]; then
-              echo "❌ devbox bootstrap timed out after 15 minutes"
-              exit 1
+          # Check if timeout command is available
+          if command -v timeout >/dev/null 2>&1; then
+            echo "Using timeout command..."
+            if timeout 900 "$BIN_DIR/devbox" bootstrap; then
+              echo "✅ devbox bootstrap completed successfully"
             else
+              bootstrap_exit_code=$?
+              if [[ $bootstrap_exit_code -eq 124 ]]; then
+                echo "❌ devbox bootstrap timed out after 15 minutes"
+                exit 1
+              else
+                echo "❌ devbox bootstrap failed with exit code: $bootstrap_exit_code"
+                exit 1
+              fi
+            fi
+          else
+            echo "Warning: timeout command not available, running without timeout..."
+            if "$BIN_DIR/devbox" bootstrap; then
+              echo "✅ devbox bootstrap completed successfully"
+            else
+              bootstrap_exit_code=$?
               echo "❌ devbox bootstrap failed with exit code: $bootstrap_exit_code"
               exit 1
             fi
