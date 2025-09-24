@@ -2,7 +2,37 @@
 set -euo pipefail
 
 REPO="${REPO:-phoenixTW/mac-devbox}"
-REF="${REF:-main}"
+
+# Debug mode (hidden from users)
+DEBUG="${DEVBOX_DEBUG:-0}"
+
+# Function to detect REF from various sources
+detect_ref() {
+  local detected_ref=""
+  
+  # Method 1: Try to detect from HTTP_REFERER if available
+  if [[ -n "${HTTP_REFERER:-}" ]]; then
+    detected_ref=$(echo "$HTTP_REFERER" | grep -oE 'refs/tags/[^/]+' | sed 's|refs/tags/||' 2>/dev/null || true)
+    [[ "$DEBUG" == "1" ]] && echo "DEBUG: Detected REF from HTTP_REFERER: $detected_ref" >&2
+  fi
+  
+  # Method 2: Try to read from local lib/common.sh if available
+  if [[ -z "$detected_ref" && -f "lib/common.sh" ]]; then
+    detected_ref=$(grep 'get_version()' lib/common.sh | sed 's/.*echo "\([^"]*\)".*/\1/' 2>/dev/null || true)
+    [[ "$DEBUG" == "1" ]] && echo "DEBUG: Detected REF from lib/common.sh: $detected_ref" >&2
+  fi
+  
+  # Method 3: Fallback to latest release from GitHub API (simple approach without jq)
+  if [[ -z "$detected_ref" ]]; then
+    detected_ref=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | grep '"tag_name"' | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/' || echo "main")
+    [[ "$DEBUG" == "1" ]] && echo "DEBUG: Detected REF from GitHub API: $detected_ref" >&2
+  fi
+  
+  # Final fallback
+  echo "${detected_ref:-main}"
+}
+
+REF="${REF:-$(detect_ref)}"
 CONFIG_DIR="${DEVBOX_CONFIG_DIR:-$HOME/.devbox}"
 BIN_DIR="$HOME/.local/bin"
 

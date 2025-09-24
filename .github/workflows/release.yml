@@ -99,7 +99,7 @@ jobs:
             ## Installation
 
             ```bash
-            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixTW/mac-devbox/${{ steps.version.outputs.version }}/install.sh)"
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/phoenixTW/mac-devbox/refs/tags/${{ steps.version.outputs.version }}/install.sh)"
             ```
           draft: false
           prerelease: false
