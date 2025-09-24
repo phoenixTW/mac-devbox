@@ -1,3 +1,11 @@
+# ## 0.1.0
+
+
+#### Other Changes
+
+* [#8](https://github.com/phoenixTW/mac-devbox/pull/8): feat: Added update command to update devbox engine.
+
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
