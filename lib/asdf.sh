@@ -9,11 +9,11 @@ asdf_init() {
   fi
   local asdf_prefix
   asdf_prefix="$(brew --prefix asdf)"
-  # shellcheck disable=SC1090
+  # shellcheck disable=SC1090,SC1091
   source "$asdf_prefix/libexec/asdf.sh"
   # Persist init for interactive shells
   grep -q 'asdf.sh' "$ZSHRC" 2>/dev/null || printf '\nsource "%s/libexec/asdf.sh"\n' "$asdf_prefix" >> "$ZSHRC"
-  grep -q 'direnv hook zsh' "$ZSHRC" 2>/dev/null || printf '\neval "$(direnv hook zsh)"\n' >> "$ZSHRC"
+  grep -q "direnv hook zsh" "$ZSHRC" 2>/dev/null || printf "\neval \"\$(direnv hook zsh)\"\n" >> "$ZSHRC"
 }
 
 asdf_plugin_present() { asdf plugin list | grep -Fxq "$1"; }

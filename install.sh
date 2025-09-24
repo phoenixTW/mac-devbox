@@ -20,10 +20,10 @@ mkdir -p "$BIN_DIR"
 install -m 0755 bin/devbox "$BIN_DIR/devbox"
 
 # Ensure ~/.local/bin on PATH
-if ! grep -q '\$HOME/.local/bin' "$HOME/.zprofile" 2>/dev/null; then
+if ! grep -q "\$HOME/.local/bin" "$HOME/.zprofile" 2>/dev/null; then
   {
     echo ''
-    echo 'export PATH="$HOME/.local/bin:$PATH"'
+    echo "export PATH=\"\$HOME/.local/bin:\$PATH\""
   } >> "$HOME/.zprofile"
 fi
 
@@ -46,9 +46,9 @@ if ! grep -q '# >>> devbox completions' "$ZSHRC" 2>/dev/null; then
   {
     echo ''
     echo '# >>> devbox completions'
-    echo 'fpath=("$HOME/.zsh/completions" $fpath)'
+    echo "fpath=(\"\$HOME/.zsh/completions\" \$fpath)"
     echo 'autoload -Uz compinit'
-    echo '[[ -n "$ZDOTDIR" ]] && compinit -d "$ZDOTDIR/.zcompdump" || compinit'
+    echo "[[ -n \"\$ZDOTDIR\" ]] && compinit -d \"\$ZDOTDIR/.zcompdump\" || compinit"
     echo '# <<< devbox completions'
   } >> "$ZSHRC"
 fi

@@ -13,7 +13,7 @@ install_homebrew() {
     eval "$(/opt/homebrew/bin/brew shellenv)"
     # Ensure brew for login shells
     if ! grep -q 'brew shellenv' "$ZPROFILE" 2>/dev/null; then
-      printf '\n%s\n' 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> "$ZPROFILE"
+      printf '\n%s\n' "eval \"\$(/opt/homebrew/bin/brew shellenv)\"" >> "$ZPROFILE"
     fi
   else
     die "Homebrew not found at /opt/homebrew"
