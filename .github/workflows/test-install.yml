@@ -194,30 +194,33 @@ jobs:
 
           # Set up shell environment
           echo "Setting up shell environment..."
-          # Check if files exist before sourcing
+          # Extract PATH from .zprofile if it exists (bash-compatible approach)
           if [[ -f "$HOME/.zprofile" ]]; then
-            echo "Sourcing .zprofile..."
-            . "$HOME/.zprofile" 2>/dev/null || echo "Warning: Failed to source .zprofile"
+            echo "Reading .zprofile for PATH configuration..."
+            # Extract PATH export lines and apply them
+            grep "^export PATH=" "$HOME/.zprofile" 2>/dev/null | while IFS= read -r line; do
+              echo "Applying: $line"
+              eval "$line" 2>/dev/null || echo "Warning: Failed to apply $line"
+            done
           else
             echo "Warning: .zprofile not found"
           fi
 
-          if [[ -f "$HOME/.zshrc" ]]; then
-            echo "Sourcing .zshrc..."
-            . "$HOME/.zshrc" 2>/dev/null || echo "Warning: Failed to source .zshrc"
-          else
-            echo "Warning: .zshrc not found"
-          fi
+          # Skip .zshrc as it contains zsh-specific syntax that breaks bash
+          echo "Skipping .zshrc (contains zsh-specific syntax)"
 
           # Ensure devbox is in PATH (fallback if shell files failed)
+          echo "Current PATH after shell setup: $PATH"
           if ! command -v devbox >/dev/null 2>&1; then
             echo "devbox not in PATH, adding manually..."
             export PATH="$HOME/.local/bin:$PATH"
+            echo "Updated PATH: $PATH"
             if ! command -v devbox >/dev/null 2>&1; then
               echo "❌ devbox command not found in PATH"
               echo "PATH: $PATH"
               echo "BIN_DIR: $BIN_DIR"
               echo "devbox binary exists: $([[ -f "$BIN_DIR/devbox" ]] && echo "yes" || echo "no")"
+              echo "devbox binary permissions: $(ls -la "$BIN_DIR/devbox" 2>/dev/null || echo "not found")"
               exit 1
             fi
           fi
